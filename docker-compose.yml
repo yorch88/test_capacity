@@ -1,0 +1,42 @@
+services:
+  mongo:
+    image: mongo:6
+    container_name: test-capacity-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build: ./backend
+    container_name: test-capacity-backend
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - MONGO_DB_NAME=test_capacity_db
+      - JWT_SECRET_KEY=CHANGE_ME_SUPER_SECRET_KEY
+      - ADMIN_USERNAME=admin
+      - ADMIN_EMAIL=admin@example.com
+      - ADMIN_PASSWORD=changeme
+    volumes:
+      - ./backend/app:/app/app
+    depends_on:
+      - mongo
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    container_name: test-capacity-frontend
+    environment:
+      - VITE_API_BASE=http://localhost:8000/api
+      - CHOKIDAR_USEPOLLING=true      # 👈 importante
+      - CHOKIDAR_INTERVAL=300         # opcional, en ms
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+
+volumes:
+  mongo_data:
