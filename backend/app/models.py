@@ -96,3 +96,33 @@ class AnalyticsPublic(BaseModel):
 
     created_by_user_id: str
     created_at: datetime
+
+
+
+class AnalyticsPublic(BaseModel):
+    id: str
+    family_id: str
+    sku: Optional[str]
+    quantity: int
+    capacity_slots: int
+    manpower_qty: int
+    units_per_manpower_per_day: int
+    fecha_release: datetime
+
+    test_cycle_time_hours: float
+    bottleneck_type: Literal["equipment", "manpower"]
+    equipment_capacity_units_per_day: float
+    manpower_capacity_units_per_day: float
+    throughput_units_per_hour: float
+    input_cycle_time_hours: float
+    input_cycle_time_minutes: float
+    total_duration_hours: float
+    first_unit_datetime: datetime
+    is_feasible: bool
+
+    created_by_user_id: str
+    created_at: datetime
+
+    # 👇 NUEVOS
+    created_by_email: Optional[EmailStr] = None
+    family_name: Optional[str] = None

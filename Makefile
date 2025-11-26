@@ -39,6 +39,9 @@ restart: down up
 build:
 	$(DC) -f $(DC_FILE) build
 
+build-front:
+	$(DC) build $(FRONTEND_SERVICE)
+
 logs:
 	$(DC) -f $(DC_FILE) logs -f
 

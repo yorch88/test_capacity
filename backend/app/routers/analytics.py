@@ -1,13 +1,97 @@
 from datetime import datetime, timedelta
 
+from typing import Optional
+from fastapi import Query
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 
+from bson import ObjectId
+from fastapi import APIRouter, Depends, HTTPException, Query
+
 from ..auth import get_current_user
-from ..db import get_analytics_collection, get_families_collection
+from ..db import get_analytics_collection, get_families_collection, get_users_collection
 from ..models import AnalyticsCreate, AnalyticsPublic, UserPublic
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
+
+@router.get("", response_model=list[AnalyticsPublic])
+async def list_analytics_history(
+    sku: str | None = Query(default=None),
+    family_id: str | None = Query(default=None),
+    current_user: UserPublic = Depends(get_current_user),
+):
+    """
+    List analytics records.
+    Optional filters:
+      - sku (partial match)
+      - family_id (exact match)
+    """
+    analytics_col = get_analytics_collection()
+    families_col = get_families_collection()
+    users_col = get_users_collection()
+
+    query: dict = {}
+    if sku:
+        # simple 'contains' filter usando regex
+        query["sku"] = {"$regex": sku, "$options": "i"}
+    if family_id:
+        query["family_id"] = family_id
+
+    cursor = analytics_col.find(query).sort("created_at", -1).limit(100)
+
+    results: list[AnalyticsPublic] = []
+
+    async for doc in cursor:
+        # Resolver family_name
+        family_name = None
+        fid = doc.get("family_id")
+        if fid:
+            try:
+                fam = await families_col.find_one({"_id": ObjectId(fid)})
+                if fam:
+                    family_name = fam.get("name")
+            except Exception:
+                pass
+
+        # Resolver created_by_email
+        created_by_email = None
+        created_by_user_id = doc.get("created_by_user_id")
+        if created_by_user_id:
+            try:
+                user_doc = await users_col.find_one({"_id": ObjectId(created_by_user_id)})
+                if user_doc:
+                    created_by_email = user_doc.get("email")
+            except Exception:
+                pass
+
+        results.append(
+            AnalyticsPublic(
+                id=str(doc["_id"]),
+                family_id=doc["family_id"],
+                sku=doc.get("sku"),
+                quantity=doc["quantity"],
+                capacity_slots=doc["capacity_slots"],
+                manpower_qty=doc["manpower_qty"],
+                units_per_manpower_per_day=doc["units_per_manpower_per_day"],
+                fecha_release=doc["fecha_release"],
+                test_cycle_time_hours=doc["test_cycle_time_hours"],
+                bottleneck_type=doc["bottleneck_type"],
+                equipment_capacity_units_per_day=doc["equipment_capacity_units_per_day"],
+                manpower_capacity_units_per_day=doc["manpower_capacity_units_per_day"],
+                throughput_units_per_hour=doc["throughput_units_per_hour"],
+                input_cycle_time_hours=doc["input_cycle_time_hours"],
+                input_cycle_time_minutes=doc["input_cycle_time_minutes"],
+                total_duration_hours=doc["total_duration_hours"],
+                first_unit_datetime=doc["first_unit_datetime"],
+                is_feasible=doc.get("is_feasible", True),
+                created_by_user_id=created_by_user_id,
+                created_at=doc["created_at"],
+                created_by_email=created_by_email,
+                family_name=family_name,
+            )
+        )
+
+    return results
 
 
 @router.post("", response_model=AnalyticsPublic)

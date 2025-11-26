@@ -4,6 +4,7 @@ import FamiliesPage from "./components/FamiliesPage.jsx";
 import AnalyticsPage from "./components/AnalyticsPage.jsx";
 import UsersPage from "./components/UsersPage.jsx";
 import LoginPanel from "./components/LoginPanel.jsx";
+import HistoryPage from "./components/HistoryPage.jsx";
 
 function App() {
   const [page, setPage] = useState("analytics");
@@ -19,6 +20,12 @@ function App() {
               onClick={() => setPage("analytics")}
             >
               Analytics
+            </button>
+            <button
+              className={page === "history" ? "font-semibold underline" : ""}
+              onClick={() => setPage("history")}
+            >
+              History
             </button>
             <button
               className={page === "families" ? "font-semibold underline" : ""}
@@ -38,6 +45,7 @@ function App() {
       </header>
       <main className="flex-1 p-6">
         {page === "analytics" && <AnalyticsPage />}
+        {page === "history" && <HistoryPage />}
         {page === "families" && <FamiliesPage />}
         {page === "users" && <UsersPage />}
       </main>

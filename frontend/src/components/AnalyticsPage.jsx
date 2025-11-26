@@ -1,18 +1,20 @@
 import React, { useEffect, useState } from "react";
+import DateTimePicker from "./DateTimePicker.jsx";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
 
 function AnalyticsPage() {
   const [families, setFamilies] = useState([]);
   const [form, setForm] = useState({
-    family_id: "",
-    sku: "",
-    quantity: 300,
-    capacity_slots: 10,
-    manpower_qty: 8,
-    units_per_manpower_per_day: 8,
-    fecha_release: "",
+  family_id: "",
+  sku: "",
+  quantity: 300,
+  capacity_slots: 10,
+  manpower_qty: 8,
+  units_per_manpower_per_day: 8,
   });
+
+  const [fechaRelease, setFechaRelease] = useState(null);
   const [result, setResult] = useState(null);
 
   const token = localStorage.getItem("access_token");
@@ -44,6 +46,10 @@ function AnalyticsPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!token) return;
+    if (!fechaRelease) {
+      console.error("Release datetime is required");
+      return;
+    }
     try {
       const res = await fetch(`${API_BASE}/analytics`, {
         method: "POST",
@@ -51,14 +57,15 @@ function AnalyticsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        
         body: JSON.stringify({
-          ...form,
-          quantity: Number(form.quantity),
-          capacity_slots: Number(form.capacity_slots),
-          manpower_qty: Number(form.manpower_qty),
-          units_per_manpower_per_day: Number(form.units_per_manpower_per_day),
-          fecha_release: new Date(form.fecha_release).toISOString(),
-        }),
+        ...form,
+        quantity: Number(form.quantity),
+        capacity_slots: Number(form.capacity_slots),
+        manpower_qty: Number(form.manpower_qty),
+        units_per_manpower_per_day: Number(form.units_per_manpower_per_day),
+        fecha_release: fechaRelease.toISOString(),
+      }),
       });
       if (!res.ok) {
         console.error("Failed to compute analytics");
@@ -169,14 +176,10 @@ function AnalyticsPage() {
             </div>
           </div>
           <div>
-            <label className="block mb-1">Target release datetime</label>
-            <input
-              type="datetime-local"
-              name="fecha_release"
-              value={form.fecha_release}
-              onChange={handleChange}
-              className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2"
-              required
+            <label className="block mb-1">Target release - Commit Date</label>
+            <DateTimePicker
+              value={fechaRelease}
+              onChange={(date) => setFechaRelease(date)}
             />
           </div>
           <button
