@@ -82,7 +82,6 @@ class AnalyticsPublic(BaseModel):
     manpower_qty: int
     units_per_manpower_per_day: int
     fecha_release: datetime
-
     test_cycle_time_hours: float
     bottleneck_type: Literal["equipment", "manpower"]
     equipment_capacity_units_per_day: float
@@ -93,7 +92,6 @@ class AnalyticsPublic(BaseModel):
     total_duration_hours: float
     first_unit_datetime: datetime
     is_feasible: bool
-
     created_by_user_id: str
     created_at: datetime
 
@@ -108,7 +106,6 @@ class AnalyticsPublic(BaseModel):
     manpower_qty: int
     units_per_manpower_per_day: int
     fecha_release: datetime
-
     test_cycle_time_hours: float
     bottleneck_type: Literal["equipment", "manpower"]
     equipment_capacity_units_per_day: float
@@ -119,10 +116,7 @@ class AnalyticsPublic(BaseModel):
     total_duration_hours: float
     first_unit_datetime: datetime
     is_feasible: bool
-
     created_by_user_id: str
     created_at: datetime
-
-    # 👇 NUEVOS
     created_by_email: Optional[EmailStr] = None
     family_name: Optional[str] = None
