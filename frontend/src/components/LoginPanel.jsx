@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
 
-function LoginPanel() {
+function LoginPanel({ onRegisterSuccess }) {
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [username, setUsername] = useState(""); // for login (can be email)
   const [password, setPassword] = useState("");
@@ -67,51 +67,64 @@ function LoginPanel() {
     }
   }
 
-async function handleRegister(e) {
-  e.preventDefault();
-  setMessage("");
-
-  // ...validaciones locales...
-
-  try {
-    const res = await fetch(`${API_BASE}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: regEmail,
-        password: regPassword,
-        captcha_a: captchaA,
-        captcha_b: captchaB,
-        captcha_result: Number(captchaAnswer),
-      }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("register error", res.status, text);
-
-      let msg = "Registration failed.";
+    async function handleRegister(e) {
+      e.preventDefault();
+      setMessage("");
+    
+      // ...validaciones locales...
+    
       try {
-        const data = JSON.parse(text);
-        if (Array.isArray(data.detail) && data.detail.length > 0) {
-          msg = data.detail[0].msg;
-        } else if (typeof data.detail === "string") {
-          msg = data.detail;
+        const res = await fetch(`${API_BASE}/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: regEmail,
+            password: regPassword,
+            captcha_a: captchaA,
+            captcha_b: captchaB,
+            captcha_result: Number(captchaAnswer),
+          }),
+        });
+    
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("register error", res.status, text);
+    
+          let msg = "Registration failed.";
+          try {
+            const data = JSON.parse(text);
+            if (Array.isArray(data.detail) && data.detail.length > 0) {
+              msg = data.detail[0].msg;
+            } else if (typeof data.detail === "string") {
+              msg = data.detail;
+            }
+          } catch (_) {}
+    
+          setMessage(msg);
+          generateCaptcha();
+          return;
         }
-      } catch (_) {}
-
-      setMessage(msg);
-      generateCaptcha();
-      return;
+    
+        // 🎯 ÉXITO:
+        alert("User Created Successfully");
+    
+        // si quieres limpiar el formulario:
+        setRegEmail("");
+        setRegPassword("");
+        setRegPassword2("");
+        generateCaptcha();
+        setMessage("");
+    
+        // avisamos al padre que el registro salió bien
+        if (onRegisterSuccess) {
+          onRegisterSuccess();
+        }
+    
+      } catch (err) {
+        console.error(err);
+        setMessage("Error during registration.");
+      }
     }
-
-    // success...
-  } catch (err) {
-    console.error(err);
-    setMessage("Error during registration.");
-  }
-}
-
 
   function handleLogout() {
     localStorage.removeItem("access_token");

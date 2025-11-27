@@ -6,12 +6,13 @@ const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
 function AnalyticsPage() {
   const [families, setFamilies] = useState([]);
   const [form, setForm] = useState({
-  family_id: "",
-  sku: "",
-  quantity: 300,
-  capacity_slots: 10,
-  manpower_qty: 8,
-  units_per_manpower_per_day: 8,
+    family_id: "",
+    sku: "",
+    quantity: 300,
+    capacity_slots: 10,
+    manpower_qty: 8,
+    units_per_manpower_per_day: 8,
+    input_cycle_time_minutes_input: 60, // 1 unidad cada 60 min como default
   });
 
   const [fechaRelease, setFechaRelease] = useState(null);
@@ -59,12 +60,13 @@ function AnalyticsPage() {
         },
         
         body: JSON.stringify({
-        ...form,
-        quantity: Number(form.quantity),
-        capacity_slots: Number(form.capacity_slots),
-        manpower_qty: Number(form.manpower_qty),
-        units_per_manpower_per_day: Number(form.units_per_manpower_per_day),
-        fecha_release: fechaRelease.toISOString(),
+          ...form,
+          quantity: Number(form.quantity),
+          capacity_slots: Number(form.capacity_slots),
+          manpower_qty: Number(form.manpower_qty),
+          units_per_manpower_per_day: Number(form.units_per_manpower_per_day),
+          input_cycle_time_minutes: Number(form.input_cycle_time_minutes_input),
+          fecha_release: fechaRelease.toISOString(),
       }),
       });
       if (!res.ok) {
@@ -137,7 +139,7 @@ function AnalyticsPage() {
               />
             </div>
             <div>
-              <label className="block mb-1">Capacity slots</label>
+              <label className="block mb-1">Test Capacity slots</label>
               <input
                 type="number"
                 name="capacity_slots"
@@ -175,13 +177,31 @@ function AnalyticsPage() {
               />
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block mb-1">Target release - Commit Date</label>
+            <label className="block mb-1">
+              Input minutes per unit:
+            </label>
+            <input
+              type="number"
+              name="input_cycle_time_minutes_input"
+              min="1"
+              value={form.input_cycle_time_minutes_input}
+              onChange={handleChange}
+              className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2"
+              required
+            />
+            </div>
+            <div><label className="block mb-1">Target release - Commit Date</label>
             <DateTimePicker
               value={fechaRelease}
               onChange={(date) => setFechaRelease(date)}
             />
+            </div>
+            
           </div>
+
           <button
             type="submit"
             className="mt-2 inline-flex items-center justify-center rounded-lg bg-emerald-500 hover:bg-emerald-400 px-4 py-2 text-sm font-medium text-slate-950"
@@ -200,8 +220,14 @@ function AnalyticsPage() {
               <span className="font-semibold">Bottleneck:</span> {result.bottleneck_type}
             </p>
             <p>
-              <span className="font-semibold">Input cycle time:</span>{" "}
-              {result.input_cycle_time_minutes.toFixed(2)} minutes per unit
+              <span className="font-semibold">Production input cycle time:</span>{" "}
+              {result.input_cycle_time_minutes_input
+                ? `${result.input_cycle_time_minutes_input.toFixed(2)} min/unit`
+                : "n/a"}
+            </p>
+            <p>
+              <span className="font-semibold">Effective system input cycle time:</span>{" "}
+              {result.input_cycle_time_minutes.toFixed(2)} min/unit
             </p>
             <p>
               <span className="font-semibold">First unit must arrive at:</span>{" "}

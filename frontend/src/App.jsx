@@ -41,8 +41,11 @@ function App() {
             </button>
           </nav>
         </div>
-        <LoginPanel />
+
+        {/* 👇 Aquí pasamos el callback para cuando el registro sea exitoso */}
+        <LoginPanel onRegisterSuccess={() => setPage("analytics")} />
       </header>
+
       <main className="flex-1 p-6">
         {page === "analytics" && <AnalyticsPage />}
         {page === "history" && <HistoryPage />}

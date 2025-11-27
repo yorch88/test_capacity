@@ -132,6 +132,8 @@ function HistoryPage() {
                 <th className="px-3 py-2 border-b border-slate-800 text-right">CT (min)</th>
                 <th className="px-3 py-2 border-b border-slate-800 text-left">Bottleneck</th>
                 <th className="px-3 py-2 border-b border-slate-800 text-left">Created by</th>
+                <th className="px-3 py-2 border-b border-slate-800 text-right">Prod input CT (min)</th>
+                <th className="px-3 py-2 border-b border-slate-800 text-right">Input capacity (u/d)</th>
               </tr>
             </thead>
             <tbody>
@@ -164,6 +166,16 @@ function HistoryPage() {
                   </td>
                   <td className="px-3 py-2 border-b border-slate-800">
                     {r.created_by_email || r.created_by_user_id}
+                  </td>
+                  <td className="px-3 py-2 border-b border-slate-800 text-right">
+                    {r.input_cycle_time_minutes_input
+                      ? r.input_cycle_time_minutes_input.toFixed(2)
+                      : "-"}
+                  </td>
+                  <td className="px-3 py-2 border-b border-slate-800 text-right">
+                    {r.input_capacity_units_per_day
+                      ? r.input_capacity_units_per_day.toFixed(2)
+                      : "-"}
                   </td>
                 </tr>
               ))}
