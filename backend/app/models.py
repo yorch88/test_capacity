@@ -124,3 +124,9 @@ class AnalyticsPublic(BaseModel):
     input_cycle_time_minutes_input: Optional[float] = None
     input_capacity_units_per_day: Optional[float] = None
 
+class AnalyticsHistoryPage(BaseModel):
+    items: list[AnalyticsPublic]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

@@ -3,6 +3,12 @@ import React, { useEffect, useState } from "react";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
 
 function HistoryPage() {
+    const [pagination, setPagination] = useState({
+  page: 1,
+  page_size: 20,
+  total_pages: 1,
+  total: 0,
+});
   const [records, setRecords] = useState([]);
   const [families, setFamilies] = useState([]);
   const [filters, setFilters] = useState({
@@ -26,35 +32,43 @@ function HistoryPage() {
     }
   }
 
-  async function loadHistory() {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (filters.sku) params.append("sku", filters.sku);
-      if (filters.family_id) params.append("family_id", filters.family_id);
+ async function loadHistory(page = 1) {
+  if (!token) return;
+  setLoading(true);
+  try {
+    const params = new URLSearchParams();
+    if (filters.sku) params.append("sku", filters.sku);
+    if (filters.family_id) params.append("family_id", filters.family_id);
+    params.append("page", String(page));
+    params.append("page_size", String(pagination.page_size));
 
-      const res = await fetch(`${API_BASE}/analytics?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        console.error("Failed to load history");
-        setLoading(false);
-        return;
-      }
-      const data = await res.json();
-      setRecords(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
+    const res = await fetch(`${API_BASE}/analytics?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      console.error("Failed to load history");
       setLoading(false);
+      return;
     }
+    const data = await res.json();
+    setRecords(data.items);
+    setPagination({
+      page: data.page,
+      page_size: data.page_size,
+      total_pages: data.total_pages,
+      total: data.total,
+    });
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
   }
+}
 
   useEffect(() => {
     if (token) {
       loadFamilies();
-      loadHistory();
+      loadHistory(1);
     }
   }, [token]);
 
@@ -65,7 +79,7 @@ function HistoryPage() {
 
   function handleSubmit(e) {
     e.preventDefault();
-    loadHistory();
+    loadHistory(1);
   }
 
   if (!token) {
@@ -181,7 +195,38 @@ function HistoryPage() {
               ))}
             </tbody>
           </table>
+          
         )}
+
+{records.length > 0 && (
+  <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
+    <div>
+      Page {pagination.page} of {pagination.total_pages} ·{" "}
+      {pagination.total} records
+    </div>
+    <div className="flex gap-2">
+      <button
+        type="button"
+        disabled={pagination.page <= 1 || loading}
+        onClick={() => loadHistory(pagination.page - 1)}
+        className="px-3 py-1 rounded-md border border-slate-700 disabled:opacity-40"
+      >
+        Prev
+      </button>
+      <button
+        type="button"
+        disabled={
+          pagination.page >= pagination.total_pages || loading
+        }
+        onClick={() => loadHistory(pagination.page + 1)}
+        className="px-3 py-1 rounded-md border border-slate-700 disabled:opacity-40"
+      >
+        Next
+      </button>
+    </div>
+  </div>
+)}
+
       </section>
     </div>
   );

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-
+import math
 from typing import Optional
 from fastapi import Query
 from bson import ObjectId
@@ -7,39 +7,42 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..auth import get_current_user
 from ..db import get_analytics_collection, get_families_collection, get_users_collection
-from ..models import AnalyticsCreate, AnalyticsPublic, UserPublic
+from ..models import AnalyticsCreate, AnalyticsPublic, UserPublic, AnalyticsHistoryPage
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
-@router.get("", response_model=list[AnalyticsPublic])
+@router.get("", response_model=AnalyticsHistoryPage)
 async def list_analytics_history(
     sku: str | None = Query(default=None),
     family_id: str | None = Query(default=None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     current_user: UserPublic = Depends(get_current_user),
 ):
-    """
-    List analytics records.
-    Optional filters:
-      - sku (partial match)
-      - family_id (exact match)
-    """
     analytics_col = get_analytics_collection()
     families_col = get_families_collection()
     users_col = get_users_collection()
 
     query: dict = {}
     if sku:
-        # simple 'contains' filter usando regex
         query["sku"] = {"$regex": sku, "$options": "i"}
     if family_id:
         query["family_id"] = family_id
 
-    cursor = analytics_col.find(query).sort("created_at", -1).limit(100)
+    total = await analytics_col.count_documents(query)
+    skip = (page - 1) * page_size
 
-    results: list[AnalyticsPublic] = []
+    cursor = (
+        analytics_col.find(query)
+        .sort("created_at", -1)
+        .skip(skip)
+        .limit(page_size)
+    )
+
+    items: list[AnalyticsPublic] = []
 
     async for doc in cursor:
-        # Resolver family_name
+        # resolver family_name y created_by_email como ya lo hacías
         family_name = None
         fid = doc.get("family_id")
         if fid:
@@ -50,7 +53,6 @@ async def list_analytics_history(
             except Exception:
                 pass
 
-        # Resolver created_by_email
         created_by_email = None
         created_by_user_id = doc.get("created_by_user_id")
         if created_by_user_id:
@@ -61,7 +63,7 @@ async def list_analytics_history(
             except Exception:
                 pass
 
-        results.append(
+        items.append(
             AnalyticsPublic(
                 id=str(doc["_id"]),
                 family_id=doc["family_id"],
@@ -82,7 +84,7 @@ async def list_analytics_history(
                 total_duration_hours=doc["total_duration_hours"],
                 first_unit_datetime=doc["first_unit_datetime"],
                 is_feasible=doc.get("is_feasible", True),
-                created_by_user_id=doc.get("created_by_user_id", ""),
+                created_by_user_id=created_by_user_id or "",
                 created_at=doc["created_at"],
                 created_by_email=created_by_email,
                 family_name=family_name,
@@ -90,7 +92,16 @@ async def list_analytics_history(
             )
         )
 
-    return results
+    total_pages = math.ceil(total / page_size) if page_size else 1
+
+    return AnalyticsHistoryPage(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
+
 
 @router.post("", response_model=AnalyticsPublic)
 async def create_analytics(payload: AnalyticsCreate, current_user: UserPublic = Depends(get_current_user)):

@@ -8,10 +8,10 @@ function AnalyticsPage() {
   const [form, setForm] = useState({
     family_id: "",
     sku: "",
-    quantity: 300,
-    capacity_slots: 10,
-    manpower_qty: 8,
-    units_per_manpower_per_day: 8,
+    quantity: 0,
+    capacity_slots: 0,
+    manpower_qty: 0,
+    units_per_manpower_per_day: 0,
     input_cycle_time_minutes_input: 60, // 1 unidad cada 60 min como default
   });
 
@@ -181,7 +181,7 @@ function AnalyticsPage() {
           <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block mb-1">
-              Input minutes per unit:
+              Minutes per unit input
             </label>
             <input
               type="number"
