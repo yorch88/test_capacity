@@ -148,6 +148,8 @@ function HistoryPage() {
                 <th className="px-3 py-2 border-b border-slate-800 text-left">Created by</th>
                 <th className="px-3 py-2 border-b border-slate-800 text-right">Prod input CT (min)</th>
                 <th className="px-3 py-2 border-b border-slate-800 text-right">Input capacity (u/d)</th>
+                <th className="px-3 py-2 border-b border-slate-800 text-left">Est. first unit</th>
+                <th className="px-3 py-2 border-b border-slate-800 text-left">Commit on risk?</th>
               </tr>
             </thead>
             <tbody>
@@ -191,6 +193,14 @@ function HistoryPage() {
                       ? r.input_capacity_units_per_day.toFixed(2)
                       : "-"}
                   </td>
+                  <td className="px-3 py-2 border-b border-slate-800">
+                  {r.estimated_first_unit_datetime
+                    ? new Date(r.estimated_first_unit_datetime).toLocaleString()
+                    : "-"}
+                </td>
+                <td className="px-3 py-2 border-b border-slate-800">
+                  {r.commit_on_risk ? "Yes" : "No"}
+                </td>
                 </tr>
               ))}
             </tbody>

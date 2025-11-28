@@ -14,7 +14,7 @@ function AnalyticsPage() {
     units_per_manpower_per_day: 0,
     input_cycle_time_minutes_input: 60, // 1 unidad cada 60 min como default
   });
-
+  const [estimatedFirstUnit, setEstimatedFirstUnit] = useState(null);
   const [fechaRelease, setFechaRelease] = useState(null);
   const [result, setResult] = useState(null);
 
@@ -67,6 +67,9 @@ function AnalyticsPage() {
           units_per_manpower_per_day: Number(form.units_per_manpower_per_day),
           input_cycle_time_minutes: Number(form.input_cycle_time_minutes_input),
           fecha_release: fechaRelease.toISOString(),
+          estimated_first_unit_datetime: estimatedFirstUnit
+          ? estimatedFirstUnit.toISOString()
+          : null,
       }),
       });
       if (!res.ok) {
@@ -199,7 +202,13 @@ function AnalyticsPage() {
               onChange={(date) => setFechaRelease(date)}
             />
             </div>
-            
+            <div>
+              <label className="block mb-1">Target release - Commit Date</label>
+              <DateTimePicker
+                value={fechaRelease}
+                onChange={(date) => setFechaRelease(date)}
+              />
+            </div>
           </div>
 
           <button
@@ -224,6 +233,10 @@ function AnalyticsPage() {
               {result.input_cycle_time_minutes_input
                 ? `${result.input_cycle_time_minutes_input.toFixed(2)} min/unit`
                 : "n/a"}
+            </p>
+            <p>
+              <span className="font-semibold">Commit on risk?</span>{" "}
+              {result.commit_on_risk ? "Yes" : "No"}
             </p>
             <p>
               <span className="font-semibold">Effective system input cycle time:</span>{" "}

@@ -72,6 +72,7 @@ class AnalyticsCreate(BaseModel):
     units_per_manpower_per_day: int = Field(..., gt=0, description="Units each technician can process per day")
     fecha_release: datetime = Field(..., description="Target datetime when last unit must be released to next station")
     input_cycle_time_minutes: float
+    estimated_first_unit_datetime: Optional[datetime] = None
 
 class AnalyticsPublic(BaseModel):
     id: str
@@ -96,6 +97,7 @@ class AnalyticsPublic(BaseModel):
     created_at: datetime
     input_cycle_time_minutes_input: Optional[float] = None
     input_capacity_units_per_day: Optional[float] = None
+
 
 
 class AnalyticsPublic(BaseModel):
@@ -123,6 +125,8 @@ class AnalyticsPublic(BaseModel):
     family_name: Optional[str] = None
     input_cycle_time_minutes_input: Optional[float] = None
     input_capacity_units_per_day: Optional[float] = None
+    estimated_first_unit_datetime: Optional[datetime] = None
+    commit_on_risk: bool = False
 
 class AnalyticsHistoryPage(BaseModel):
     items: list[AnalyticsPublic]

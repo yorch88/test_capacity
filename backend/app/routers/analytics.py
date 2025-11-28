@@ -83,7 +83,9 @@ async def list_analytics_history(
                 input_cycle_time_minutes=doc["input_cycle_time_minutes"],
                 total_duration_hours=doc["total_duration_hours"],
                 first_unit_datetime=doc["first_unit_datetime"],
+                estimated_first_unit_datetime=doc.get("estimated_first_unit_datetime"),
                 is_feasible=doc.get("is_feasible", True),
+                commit_on_risk=doc.get("commit_on_risk", False),
                 created_by_user_id=created_by_user_id or "",
                 created_at=doc["created_at"],
                 created_by_email=created_by_email,
@@ -132,17 +134,32 @@ async def create_analytics(payload: AnalyticsCreate, current_user: UserPublic = 
     bottleneck_type = min(capacity_map, key=capacity_map.get)
     throughput_units_per_day = capacity_map[bottleneck_type]
     throughput_units_per_hour = throughput_units_per_day / 24.0
-
-    # 3) Tiempo total para procesar todas las unidades
+    
     total_duration_days = payload.quantity / throughput_units_per_day
     total_duration_hours = total_duration_days * 24.0
 
-    # 4) Primera unidad que debe llegar a pruebas
     fecha_release = payload.fecha_release
-    first_unit_datetime = fecha_release - timedelta(hours=total_duration_hours)
+    required_first_unit_datetime = fecha_release - timedelta(hours=total_duration_hours)
 
-    # (si quieres lógica de is_feasible más estricta, puedes checar first_unit_datetime < ahora, etc.)
-    is_feasible = True
+    estimated = payload.estimated_first_unit_datetime
+
+    if estimated is None:
+        # Modo “clásico”: no se especificó fecha de primera unidad
+        first_unit_datetime = required_first_unit_datetime
+        is_feasible = True
+        commit_on_risk = False
+    else:
+        # Modo “con Estimated Input Date”: preguntamos si es posible
+        finish_from_estimated = estimated + timedelta(hours=total_duration_hours)
+
+        # ¿Alcanzamos a liberar todo antes o en el release date?
+        is_feasible = finish_from_estimated <= fecha_release
+        # Si NO es factible, el commit es “a riesgo”
+        commit_on_risk = not is_feasible
+
+        # first_unit_datetime sigue representando la fecha REQUERIDA teóricamente
+        first_unit_datetime = required_first_unit_datetime
+
 
     doc = {
         "family_id": payload.family_id,
@@ -158,12 +175,13 @@ async def create_analytics(payload: AnalyticsCreate, current_user: UserPublic = 
         "manpower_capacity_units_per_day": manpower_capacity_units_per_day,
         "input_capacity_units_per_day": input_capacity_units_per_day,
         "throughput_units_per_hour": throughput_units_per_hour,
-        "input_cycle_time_hours": 24.0 / throughput_units_per_day,  # requerido global
-        "input_cycle_time_minutes": 60.0 / throughput_units_per_hour,
-        "input_cycle_time_minutes_input": payload.input_cycle_time_minutes,
+        "input_cycle_time_hours": input_cycle_time_hours,
+        "input_cycle_time_minutes": input_cycle_time_minutes,
         "total_duration_hours": total_duration_hours,
         "first_unit_datetime": first_unit_datetime,
+        "estimated_first_unit_datetime": estimated,
         "is_feasible": is_feasible,
+        "commit_on_risk": commit_on_risk,
         "created_by_user_id": current_user.id,
         "created_at": datetime.utcnow(),
     }
