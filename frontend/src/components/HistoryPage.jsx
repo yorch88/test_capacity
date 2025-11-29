@@ -199,7 +199,13 @@ function HistoryPage() {
                     : "-"}
                 </td>
                 <td className="px-3 py-2 border-b border-slate-800">
-                  {r.commit_on_risk ? "Yes" : "No"}
+                  <span
+                    className={`px-2 py-1 rounded text-white ${
+                      r.commit_on_risk ? "bg-red-600" : "bg-green-600"
+                    }`}
+                  >
+                    {r.commit_on_risk ? "Yes" : "No"}
+                  </span>
                 </td>
                 </tr>
               ))}

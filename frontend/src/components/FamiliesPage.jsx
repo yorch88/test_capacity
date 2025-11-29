@@ -108,7 +108,7 @@ function FamiliesPage() {
               >
                 <div>
                   <p className="text-slate-400">
-                    CT: {f.test_cycle_time_hours} h · Created by:{" "}
+                    Family: {f.name}, CT: {f.test_cycle_time_hours} h · Created by:{" "}
                     {f.created_by_email || f.created_by_user_id}
                   </p>
                 </div>

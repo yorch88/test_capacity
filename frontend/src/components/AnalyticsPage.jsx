@@ -68,8 +68,8 @@ function AnalyticsPage() {
           input_cycle_time_minutes: Number(form.input_cycle_time_minutes_input),
           fecha_release: fechaRelease.toISOString(),
           estimated_first_unit_datetime: estimatedFirstUnit
-          ? estimatedFirstUnit.toISOString()
-          : null,
+        ? estimatedFirstUnit.toISOString()
+        : null,
       }),
       });
       if (!res.ok) {
@@ -130,7 +130,7 @@ function AnalyticsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block mb-1">Quantity</label>
+              <label className="block mb-1">Units Quantity</label>
               <input
                 type="number"
                 name="quantity"
@@ -196,18 +196,18 @@ function AnalyticsPage() {
               required
             />
             </div>
+            <div>
+              <label className="block mb-1">Estimated input datetime (optional)</label>
+              <DateTimePicker
+                value={estimatedFirstUnit}
+                onChange={(date) => setEstimatedFirstUnit(date)}
+              />
+            </div>
             <div><label className="block mb-1">Target release - Commit Date</label>
             <DateTimePicker
               value={fechaRelease}
               onChange={(date) => setFechaRelease(date)}
             />
-            </div>
-            <div>
-              <label className="block mb-1">Target release - Commit Date</label>
-              <DateTimePicker
-                value={fechaRelease}
-                onChange={(date) => setFechaRelease(date)}
-              />
             </div>
           </div>
 
@@ -235,13 +235,19 @@ function AnalyticsPage() {
                 : "n/a"}
             </p>
             <p>
-              <span className="font-semibold">Commit on risk?</span>{" "}
-              {result.commit_on_risk ? "Yes" : "No"}
-            </p>
-            <p>
               <span className="font-semibold">Effective system input cycle time:</span>{" "}
               {result.input_cycle_time_minutes.toFixed(2)} min/unit
             </p>
+            <p className="flex items-center gap-2">
+            <span className="font-semibold">Commit on risk?</span>
+            <span
+              className={`px-2 py-1 rounded text-white ${
+                result.commit_on_risk ? "bg-red-600" : "bg-green-600"
+              }`}
+            >
+              {result.commit_on_risk ? "Yes" : "No"}
+            </span>
+          </p>
             <p>
               <span className="font-semibold">First unit must arrive at:</span>{" "}
               {new Date(result.first_unit_datetime).toLocaleString()}
