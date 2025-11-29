@@ -7,111 +7,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..auth import get_current_user
 from ..db import get_analytics_collection, get_families_collection, get_users_collection
+from ..helpers import _ensure_utc
 from ..models import AnalyticsCreate, AnalyticsPublic, UserPublic, AnalyticsHistoryPage
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
-@router.get("", response_model=AnalyticsHistoryPage)
-async def list_analytics_history(
-    sku: str | None = Query(default=None),
-    family_id: str | None = Query(default=None),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    current_user: UserPublic = Depends(get_current_user),
-):
-    analytics_col = get_analytics_collection()
-    families_col = get_families_collection()
-    users_col = get_users_collection()
 
-    query: dict = {}
-    if sku:
-        query["sku"] = {"$regex": sku, "$options": "i"}
-    if family_id:
-        query["family_id"] = family_id
-
-    total = await analytics_col.count_documents(query)
-    skip = (page - 1) * page_size
-
-    cursor = (
-        analytics_col.find(query)
-        .sort("created_at", -1)
-        .skip(skip)
-        .limit(page_size)
-    )
-
-    items: list[AnalyticsPublic] = []
-
-    async for doc in cursor:
-        # resolver family_name y created_by_email como ya lo hacías
-        family_name = None
-        fid = doc.get("family_id")
-        if fid:
-            try:
-                fam = await families_col.find_one({"_id": ObjectId(fid)})
-                if fam:
-                    family_name = fam.get("name")
-            except Exception:
-                pass
-
-        created_by_email = None
-        created_by_user_id = doc.get("created_by_user_id")
-        if created_by_user_id:
-            try:
-                user_doc = await users_col.find_one({"_id": ObjectId(created_by_user_id)})
-                if user_doc:
-                    created_by_email = user_doc.get("email")
-            except Exception:
-                pass
-
-        items.append(
-            AnalyticsPublic(
-                id=str(doc["_id"]),
-                family_id=doc["family_id"],
-                sku=doc.get("sku"),
-                quantity=doc["quantity"],
-                capacity_slots=doc["capacity_slots"],
-                manpower_qty=doc["manpower_qty"],
-                units_per_manpower_per_day=doc["units_per_manpower_per_day"],
-                fecha_release=doc["fecha_release"],
-                test_cycle_time_hours=doc["test_cycle_time_hours"],
-                bottleneck_type=doc["bottleneck_type"],
-                equipment_capacity_units_per_day=doc["equipment_capacity_units_per_day"],
-                manpower_capacity_units_per_day=doc["manpower_capacity_units_per_day"],
-                input_capacity_units_per_day=doc.get("input_capacity_units_per_day"),
-                throughput_units_per_hour=doc["throughput_units_per_hour"],
-                input_cycle_time_hours=doc["input_cycle_time_hours"],
-                input_cycle_time_minutes=doc["input_cycle_time_minutes"],
-                total_duration_hours=doc["total_duration_hours"],
-                first_unit_datetime=doc["first_unit_datetime"],
-                estimated_first_unit_datetime=doc.get("estimated_first_unit_datetime"),
-                is_feasible=doc.get("is_feasible", True),
-                commit_on_risk=doc.get("commit_on_risk", False),
-                created_by_user_id=created_by_user_id or "",
-                created_at=doc["created_at"],
-                created_by_email=created_by_email,
-                family_name=family_name,
-                input_cycle_time_minutes_input=doc.get("input_cycle_time_minutes_input"),
-            )
-        )
-
-    total_pages = math.ceil(total / page_size) if page_size else 1
-
-    return AnalyticsHistoryPage(
-        items=items,
-        total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=total_pages,
-    )
-
-
-
-@router.post("", response_model=AnalyticsPublic)
-async def create_analytics(
+async def _build_analytics_doc(
     payload: AnalyticsCreate,
-    current_user: UserPublic = Depends(get_current_user),
+    current_user: UserPublic,
 ):
-    analytics_col = get_analytics_collection()
     families_col = get_families_collection()
 
     # 1) Obtener familia y CT
@@ -171,37 +76,28 @@ async def create_analytics(
 
     # 5) Lógica de Estimated Input Date + commit_on_risk (parte 1)
     if estimated is None:
-        # Modo “clásico”: no se especificó fecha estimada de primera unidad
         first_unit_datetime = required_first_unit_datetime
         is_feasible = True
         commit_on_risk = False
     else:
-        # Modo “con Estimated Input Date”: partimos de esa fecha hacia adelante
         finish_from_estimated = estimated + timedelta(hours=total_duration_hours)
-
-        # ¿Alcanzamos a liberar todo antes o en fecha_release?
         is_feasible = finish_from_estimated <= fecha_release
-        # Si NO es factible, el commit es “a riesgo”
         commit_on_risk = not is_feasible
-
-        # first_unit_datetime sigue representando la fecha REQUERIDA teórica
         first_unit_datetime = required_first_unit_datetime
 
     # 6) Check adicional: ¿la primera unidad requerida está en el pasado?
     now_utc = datetime.now(timezone.utc)
-    # Asegurar que first_unit_datetime también esté en UTC-aware
     if first_unit_datetime.tzinfo is None:
         first_dt_utc = first_unit_datetime.replace(tzinfo=timezone.utc)
     else:
         first_dt_utc = first_unit_datetime.astimezone(timezone.utc)
 
-    # si para cumplir tendrías que haber empezado en el pasado → siempre es a riesgo
     if first_dt_utc < now_utc:
         is_feasible = False
         commit_on_risk = True
 
-    # 7) Construir documento para Mongo
     now = now_utc
+
     doc = {
         "family_id": payload.family_id,
         "sku": payload.sku,
@@ -216,10 +112,8 @@ async def create_analytics(
         "manpower_capacity_units_per_day": manpower_capacity_units_per_day,
         "input_capacity_units_per_day": input_capacity_units_per_day,
         "throughput_units_per_hour": throughput_units_per_hour,
-        # CT efectivo del sistema
         "input_cycle_time_hours": input_cycle_time_hours,
         "input_cycle_time_minutes": input_cycle_time_minutes,
-        # CT de producción (input real desde producción)
         "input_cycle_time_minutes_input": payload.input_cycle_time_minutes,
         "total_duration_hours": total_duration_hours,
         "first_unit_datetime": first_unit_datetime,
@@ -230,7 +124,133 @@ async def create_analytics(
         "created_at": now,
     }
 
-    # 8) Guardar y devolver
+    return doc, family
+
+@router.post("/compute", response_model=AnalyticsPublic)
+async def compute_analytics(
+    payload: AnalyticsCreate,
+    current_user: UserPublic = Depends(get_current_user),
+):
+    doc, family = await _build_analytics_doc(payload, current_user)
+
+    # id "fake" para cumplir AnalyticsPublic; este resultado NO se guarda
+    return AnalyticsPublic(
+        id="preview",
+        **doc,
+        created_by_email=current_user.email,
+        family_name=family.get("name"),
+    )
+
+@router.get("", response_model=AnalyticsHistoryPage)
+async def list_analytics_history(
+    sku: str | None = Query(default=None),
+    family_id: str | None = Query(default=None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: UserPublic = Depends(get_current_user),
+):
+    analytics_col = get_analytics_collection()
+    families_col = get_families_collection()
+    users_col = get_users_collection()
+
+    query: dict = {}
+    if sku:
+        query["sku"] = {"$regex": sku, "$options": "i"}
+    if family_id:
+        query["family_id"] = family_id
+
+    total = await analytics_col.count_documents(query)
+    skip = (page - 1) * page_size
+
+    cursor = (
+        analytics_col.find(query)
+        .sort("created_at", -1)
+        .skip(skip)
+        .limit(page_size)
+    )
+
+    items: list[AnalyticsPublic] = []
+
+    async for doc in cursor:
+        # resolver family_name y created_by_email como ya lo hacías
+        family_name = None
+        fid = doc.get("family_id")
+        if fid:
+            try:
+                fam = await families_col.find_one({"_id": ObjectId(fid)})
+                if fam:
+                    family_name = fam.get("name")
+            except Exception:
+                pass
+
+        created_by_email = None
+        created_by_user_id = doc.get("created_by_user_id")
+        if created_by_user_id:
+            try:
+                user_doc = await users_col.find_one({"_id": ObjectId(created_by_user_id)})
+                if user_doc:
+                    created_by_email = user_doc.get("email")
+            except Exception:
+                pass
+
+        # 👇 Normalizar fechas a UTC-aware para que el front las vea igual que el POST
+        fecha_release = _ensure_utc(doc["fecha_release"])
+        first_unit_datetime = _ensure_utc(doc["first_unit_datetime"])
+        estimated_first_unit = _ensure_utc(doc.get("estimated_first_unit_datetime"))
+        created_at = _ensure_utc(doc["created_at"])
+
+        items.append(
+            AnalyticsPublic(
+                id=str(doc["_id"]),
+                family_id=doc["family_id"],
+                sku=doc.get("sku"),
+                quantity=doc["quantity"],
+                capacity_slots=doc["capacity_slots"],
+                manpower_qty=doc["manpower_qty"],
+                units_per_manpower_per_day=doc["units_per_manpower_per_day"],
+                fecha_release=fecha_release,
+                test_cycle_time_hours=doc["test_cycle_time_hours"],
+                bottleneck_type=doc["bottleneck_type"],
+                equipment_capacity_units_per_day=doc["equipment_capacity_units_per_day"],
+                manpower_capacity_units_per_day=doc["manpower_capacity_units_per_day"],
+                input_capacity_units_per_day=doc.get("input_capacity_units_per_day"),
+                throughput_units_per_hour=doc["throughput_units_per_hour"],
+                input_cycle_time_hours=doc["input_cycle_time_hours"],
+                input_cycle_time_minutes=doc["input_cycle_time_minutes"],
+                total_duration_hours=doc["total_duration_hours"],
+                first_unit_datetime=first_unit_datetime,
+                estimated_first_unit_datetime=estimated_first_unit,
+                is_feasible=doc.get("is_feasible", True),
+                commit_on_risk=doc.get("commit_on_risk", False),
+                created_by_user_id=created_by_user_id or "",
+                created_at=created_at,
+                created_by_email=created_by_email,
+                family_name=family_name,
+                input_cycle_time_minutes_input=doc.get("input_cycle_time_minutes_input"),
+            )
+        )
+
+    total_pages = math.ceil(total / page_size) if page_size else 1
+
+    return AnalyticsHistoryPage(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
+
+
+
+@router.post("", response_model=AnalyticsPublic)
+async def create_analytics(
+    payload: AnalyticsCreate,
+    current_user: UserPublic = Depends(get_current_user),
+):
+    analytics_col = get_analytics_collection()
+
+    doc, family = await _build_analytics_doc(payload, current_user)
+
     result = await analytics_col.insert_one(doc)
 
     return AnalyticsPublic(
